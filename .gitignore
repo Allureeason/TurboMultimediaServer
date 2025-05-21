@@ -1,0 +1,14 @@
+build/
+bin/
+lib/
+CMakeFiles/
+Makefile
+
+# base
+src/base/build/
+
+# main
+main/build/
+
+# third_party
+third_party/build/

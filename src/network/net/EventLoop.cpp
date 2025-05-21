@@ -1,0 +1,178 @@
+#include "EventLoop.h"
+#include "network/base/Network.h"
+#include <string.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+using namespace tmms::network;
+
+static thread_local EventLoop* t_loopInThisThread = nullptr;
+
+EventLoop::EventLoop()
+    : epoll_(epoll_create(1024))
+    , epoll_events_(1024) {
+
+    if (epoll_ < 0) {
+        NETLOG_ERROR << "EventLoop::EventLoop(): "
+                     << "epoll_create failed: " << strerror(errno);
+        exit(-1);
+    }
+
+    if (t_loopInThisThread) {
+        NETLOG_ERROR << "Another EventLoop " << t_loopInThisThread
+                     << " exists in this thread " << pthread_self();
+        exit(-1);
+    }
+
+    NETLOG_INFO << "EventLoop::EventLoop(): "
+                << " loop: " << this
+                << " epoll: " << epoll_
+                << " events: " << epoll_events_.size();
+    t_loopInThisThread = this;
+}
+
+EventLoop::~EventLoop() {
+    quit();
+}
+
+void EventLoop::loop() {
+    looping_ = true;
+    while (looping_) {
+        memset(&epoll_events_[0], 0, epoll_events_.size() * sizeof(struct epoll_event));
+
+
+        int ret = epoll_wait(epoll_,
+                        &epoll_events_[0],
+                        static_cast<int>(epoll_events_.size()),
+                        -1);
+
+        if (ret >= 0) {
+            for (int i = 0; i < ret; ++i) {
+                struct epoll_event& e = epoll_events_[i];
+                int fd = e.data.fd;
+
+                auto it = events_.find(fd);
+                if (it == events_.end()) {
+                    NETLOG_ERROR << "EventLoop::loop(): "
+                                 << "fd " << fd << " not found";
+                    continue;
+                }
+
+                EventPtr& event = it->second;
+
+                if (e.events & EPOLLERR) {
+                    // fd error
+                    int err = 0;
+                    socklen_t len = sizeof(err);
+                    getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &len);
+                    event->onError(strerror(err));
+
+                } else if ((e.events & EPOLLHUP) && !(e.events & EPOLLIN)) {
+                    // fd hang up
+                    event->onClose();
+                } else if (e.events & (EPOLLIN | EPOLLPRI)) {
+                    // fd readable
+                    event->onRead();
+                } else if (e.events & EPOLLOUT) {
+                    // fd writable
+                    event->onWrite();
+                }
+            }
+
+            // resize epoll_events_ if needed
+            if (ret == static_cast<int>(epoll_events_.size())) {
+                epoll_events_.resize(epoll_events_.size() * 2);
+            }
+            
+        } else if (ret < 0) {
+            // error
+            NETLOG_ERROR << "epoll_wait error: " << strerror(errno);
+        }
+        
+    }
+}
+
+void EventLoop::quit() {
+    looping_ = false;
+    ::close(epoll_);
+}
+
+void EventLoop::addEvent(const EventPtr& event) {
+    int fd = event->getFd();
+    auto it = events_.find(fd);
+    if (it != events_.end()) {
+        NETLOG_ERROR << "EventLoop::addEvent(): "
+                     << "fd " << fd << " already exists";
+        return;
+    }
+
+    event->setEvents(kEventRead);
+    events_[fd] = event;
+
+    struct epoll_event e;
+    memset(&e, 0, sizeof(e));
+    e.data.fd = fd;
+    e.events = event->getEvents();
+    epoll_ctl(epoll_, EPOLL_CTL_ADD, fd, &e);
+
+    NETLOG_INFO << "fd " << fd << " added to epoll";
+}
+
+void EventLoop::removeEvent(const EventPtr& event) {
+    int fd = event->getFd();
+    auto it = events_.find(fd);
+    if (it == events_.end()) {
+        return;
+    }
+
+    events_.erase(it);
+
+    struct epoll_event e;
+    memset(&e, 0, sizeof(e));
+    e.data.fd = fd;
+    epoll_ctl(epoll_, EPOLL_CTL_DEL, fd, &e);
+}
+
+void EventLoop::enableEventReading(const EventPtr& event, bool enable) {
+    int fd = event->getFd();
+    auto it = events_.find(fd);
+    if (it == events_.end()) {
+        NETLOG_ERROR << "EventLoop::enableEventReading(): "
+                     << "fd " << fd << " not found";
+        return;
+    }
+
+    if (enable) {
+        event->setEvents(event->getEvents() | kEventRead);
+    } else {
+        event->setEvents(event->getEvents() & ~kEventRead);
+    }
+
+    struct epoll_event e;
+    memset(&e, 0, sizeof(e));
+    e.data.fd = fd;
+    e.events = event->getEvents();
+    epoll_ctl(epoll_, EPOLL_CTL_MOD, fd, &e);
+}
+
+void EventLoop::enableEventWriting(const EventPtr& event, bool enable) {
+    int fd = event->getFd();
+    auto it = events_.find(fd);
+    if (it == events_.end()) {
+        NETLOG_ERROR << "EventLoop::enableEventWriting(): "
+                     << "fd " << fd << " not found";
+        return;
+    }
+
+    if (enable) {
+        event->setEvents(event->getEvents() | kEventWrite);
+    } else {
+        event->setEvents(event->getEvents() & ~kEventWrite);
+    }
+
+    struct epoll_event e;
+    memset(&e, 0, sizeof(e));
+    e.data.fd = fd;
+    e.events = event->getEvents();
+    epoll_ctl(epoll_, EPOLL_CTL_MOD, fd, &e);
+}
