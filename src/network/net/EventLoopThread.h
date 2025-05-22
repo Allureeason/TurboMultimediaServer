@@ -20,6 +20,7 @@ namespace tmms {
                 void run();
                 EventLoop* getLoop() const;
                 
+                std::thread& getThread();
             private:
                 void startLoop();
 

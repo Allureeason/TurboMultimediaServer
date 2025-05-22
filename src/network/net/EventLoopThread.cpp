@@ -58,3 +58,7 @@ void EventLoopThread::startLoop() {
     running_ = false;
     loop_ = nullptr;
 }
+
+std::thread& EventLoopThread::getThread() {
+    return thread_;
+}

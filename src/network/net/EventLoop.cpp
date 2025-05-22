@@ -1,12 +1,14 @@
 #include "EventLoop.h"
 #include "network/base/Network.h"
+#include "base/TTime.h"
+
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
 using namespace tmms::network;
 
-static thread_local EventLoop* t_loopInThisThread = nullptr;
+static thread_local EventLoop* t_event_loop = nullptr;
 
 EventLoop::EventLoop()
     : epoll_(epoll_create(1024))
@@ -18,8 +20,8 @@ EventLoop::EventLoop()
         exit(-1);
     }
 
-    if (t_loopInThisThread) {
-        NETLOG_ERROR << "Another EventLoop " << t_loopInThisThread
+    if (t_event_loop) {
+        NETLOG_ERROR << "Another EventLoop " << t_event_loop
                      << " exists in this thread " << pthread_self();
         exit(-1);
     }
@@ -28,7 +30,7 @@ EventLoop::EventLoop()
                 << " loop: " << this
                 << " epoll: " << epoll_
                 << " events: " << epoll_events_.size();
-    t_loopInThisThread = this;
+    t_event_loop = this;
 }
 
 EventLoop::~EventLoop() {
@@ -37,6 +39,8 @@ EventLoop::~EventLoop() {
 
 void EventLoop::loop() {
     looping_ = true;
+    int timeout = 1000;
+
     while (looping_) {
         memset(&epoll_events_[0], 0, epoll_events_.size() * sizeof(struct epoll_event));
 
@@ -44,7 +48,7 @@ void EventLoop::loop() {
         int ret = epoll_wait(epoll_,
                         &epoll_events_[0],
                         static_cast<int>(epoll_events_.size()),
-                        -1);
+                        timeout);
 
         if (ret >= 0) {
             for (int i = 0; i < ret; ++i) {
@@ -83,6 +87,13 @@ void EventLoop::loop() {
             if (ret == static_cast<int>(epoll_events_.size())) {
                 epoll_events_.resize(epoll_events_.size() * 2);
             }
+
+            // 执行任务队列
+            runFunctions();
+
+            // 检查并执行定时任务
+            auto now = tmms::base::TTime::nowMs();
+            timing_wheel_.onTimer(now);
             
         } else if (ret < 0) {
             // error
@@ -175,4 +186,96 @@ void EventLoop::enableEventWriting(const EventPtr& event, bool enable) {
     e.data.fd = fd;
     e.events = event->getEvents();
     epoll_ctl(epoll_, EPOLL_CTL_MOD, fd, &e);
+}
+
+void EventLoop::runInLoop(const Func& f) {
+    if (isInLoopThread()) {
+        f();
+    } else {
+        std::lock_guard<std::mutex> lk(func_mtx_);
+        functions_.push(f);
+        weakup();
+    }
+
+}
+
+void EventLoop::runInLoop(Func&& f) {
+    if (isInLoopThread()) {
+        f();
+    } else {
+        std::lock_guard<std::mutex> lk(func_mtx_);
+        functions_.push(std::move(f));
+        weakup();
+    }
+}
+
+bool EventLoop::isInLoopThread() {
+    return t_event_loop == this;
+}
+
+void EventLoop::assertInLoopThread() {
+    if (!isInLoopThread()) {
+        NETLOG_ERROR << "It is forbidden to run loop on other thread.";
+        exit(-1);
+    }
+}
+
+void EventLoop::runFunctions() {
+    std::lock_guard<std::mutex> lk(func_mtx_);
+    while (!functions_.empty()) {
+        auto f = functions_.front();
+        f();
+        functions_.pop();
+    }
+}
+
+void EventLoop::weakup() {
+    if (!pipe_) {
+        pipe_ = std::make_shared<PipeEvent>(this);
+        addEvent(pipe_);
+    }
+
+    // 向写管道fd写入数据，触发读fd的可读时间，从而唤醒epoll
+    int64_t tmp = 1;
+    pipe_->write((const char*)&tmp, sizeof(tmp));
+}
+
+void EventLoop::runAfter(int delay, const Func& f) {
+    if (isInLoopThread()) {
+        timing_wheel_.runAfter(delay, f);
+    } else {
+        runInLoop([this, delay, f]() {
+            timing_wheel_.runAfter(delay, f);
+        });
+    }
+}
+
+void EventLoop::runAfter(int delay, Func&& f)  {
+    if (isInLoopThread()) {
+        timing_wheel_.runAfter(delay, f);
+    } else {
+        runInLoop([this, delay, f]() {
+            timing_wheel_.runAfter(delay, f);
+        });
+    }
+}
+
+void EventLoop::runEvery(int interval, const Func& f) {
+    if (isInLoopThread()) {
+        timing_wheel_.runAfter(interval, f);
+    } else {
+        runInLoop([this, interval, f]() {
+            timing_wheel_.runEvery(interval, f);
+        });
+    }
+}
+
+void EventLoop::runEvery(int interval, Func&& f) {
+    if (isInLoopThread()) {
+        timing_wheel_.runAfter(interval, f);
+    } else {
+        runInLoop([this, interval, f]() {
+            timing_wheel_.runEvery(interval, f);
+        });
+    }
 }

@@ -5,13 +5,20 @@
 #include <vector>
 #include <unordered_map>
 #include <memory>
+#include <functional>
+#include <mutex>
+#include <queue>
 
 #include "Event.h"
+#include "PipeEvent.h"
+#include "TimingWheel.h"
 
 namespace tmms {
     namespace network {
 
         using EventPtr = std::shared_ptr<Event>;
+        using Func = std::function<void()>;
+        using PipeEventPtr = std::shared_ptr<PipeEvent>;
 
         class EventLoop {
         public:
@@ -26,11 +33,30 @@ namespace tmms {
             void enableEventReading(const EventPtr& event, bool enable);
             void enableEventWriting(const EventPtr& event, bool enable);
 
+            bool isInLoopThread();
+
+            void runInLoop(const Func& f);
+            void runInLoop(Func&& f);
+
+            void runAfter(int delay, const Func& f);
+            void runAfter(int delay, Func&& f);
+            void runEvery(int interval, const Func& f);
+            void runEvery(int interval, Func&& f);
+
         private:
+            void assertInLoopThread();
+            void runFunctions();
+            void weakup();
+
             bool looping_ { false };
             int epoll_ { -1 };
             std::vector<struct epoll_event> epoll_events_;
             std::unordered_map<int, EventPtr> events_;
+            std::queue<Func> functions_;
+            std::mutex func_mtx_;
+            PipeEventPtr pipe_ { nullptr };
+
+            TimingWheel timing_wheel_;
         };
     }
 }
