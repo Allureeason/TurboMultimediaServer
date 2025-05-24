@@ -3,7 +3,7 @@
 
 #include <string>
 #include <cstdint>
-
+#include <sys/socket.h>
 
 namespace tmms {
     namespace network {
@@ -28,6 +28,10 @@ namespace tmms {
             bool isWanIP() const;
             bool isLanIP() const;
 
+
+            void setIP(const std::string& ip);
+            void setPort(uint16_t port);
+            void setIsIPv6(bool is_ipv6);
 
         private:
             std::string ip_;

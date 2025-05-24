@@ -116,3 +116,14 @@ bool InetAddress::isLanIP() const {
     return isA || isB || isC;
 }
 
+void InetAddress::setIP(const std::string& ip) {
+    ip_ = ip;
+}
+
+void InetAddress::setPort(uint16_t port) {
+    port_ = std::to_string(port);
+}
+
+void InetAddress::setIsIPv6(bool is_ipv6) {
+    is_ipv6_ = is_ipv6;
+}
