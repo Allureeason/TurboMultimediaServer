@@ -8,3 +8,6 @@ target_link_libraries(TestInetAddress base network)
 
 add_executable(TestSocketOpt TestSocketOpt.cpp)
 target_link_libraries(TestSocketOpt base network)
+
+add_executable(TestAcceptor TestAcceptor.cpp)
+target_link_libraries(TestAcceptor base network)
