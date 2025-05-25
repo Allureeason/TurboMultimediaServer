@@ -64,7 +64,7 @@ void TcpConnection::onRead() {
             break;
         } else {
             if (err != EINTR && err != EAGAIN && err != EWOULDBLOCK) {
-                NETLOG_ERROR << "read error: " << err << " - " << strerror(err);
+                NETLOG_ERROR << "read error: " << err << " - " << strerror(err) << " peer: " << peerAddr_.toIpPort();
                 onClose();
             }
             break;
@@ -83,6 +83,53 @@ void TcpConnection::setWriteCompleteCallback(const WriteCompleteCallback& cb) {
 
 void TcpConnection::setWriteCompleteCallback(WriteCompleteCallback&& cb) {
     write_complete_cb_ = std::move(cb);
+}
+
+void TcpConnection::onWrite() {
+    if (closed_) {
+        NETLOG_ERROR << "tcp connection already closed. peer: " << peerAddr_.toIpPort();
+        return;
+    }
+
+    if (!io_vec_list_.empty()) {
+        while (true) {
+            auto sendLen = ::writev(fd_, &io_vec_list_[0], io_vec_list_.size());
+            if (sendLen > 0) {
+                while (sendLen > 0) {
+                    if (sendLen < io_vec_list_.front().iov_len) {
+                        io_vec_list_.front().iov_base = static_cast<char*>(io_vec_list_.front().iov_base) + sendLen;
+                        io_vec_list_.front().iov_len -= sendLen;
+                        break;
+                    } else {
+                        sendLen -= io_vec_list_.front().iov_len;
+                        io_vec_list_.erase(io_vec_list_.begin());
+                    }
+
+                    if (io_vec_list_.empty()) {
+                        enableWriting(false);
+                        if (write_complete_cb_) {
+                            write_complete_cb_(std::dynamic_pointer_cast<TcpConnection>(shared_from_this()));
+                        }
+                        return;
+                    }
+                }
+            } else {
+                int err = errno;
+                if (err != EINTR && err != EAGAIN && err != EWOULDBLOCK) {
+                    NETLOG_ERROR << "write error: " << err << " - " << strerror(err) << " peer: " << peerAddr_.toIpPort();
+                    onClose();
+                    return;
+                }
+                break;
+            }
+        }
+    } else {
+        enableWriting(false);
+        if (write_complete_cb_) {
+            write_complete_cb_(std::dynamic_pointer_cast<TcpConnection>(shared_from_this()));
+        }
+    }
+    
 }
 
 void TcpConnection::send(const void * buf, size_t len) {
@@ -127,7 +174,7 @@ void TcpConnection::sendInLoop(const void * buf, size_t len) {
         if (sendLen < 0) {
             int err = errno;
             if (err != EINTR && err != EAGAIN && err != EWOULDBLOCK) {
-                NETLOG_ERROR << "read error: " << err << " - " << strerror(err);
+                NETLOG_ERROR << "read error: " << err << " - " << strerror(err) << " peer: " << peerAddr_.toIpPort();
                 onClose();
                 return;
             }
