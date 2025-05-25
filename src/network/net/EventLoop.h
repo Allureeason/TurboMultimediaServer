@@ -33,6 +33,7 @@ namespace tmms {
             void enableEventReading(const EventPtr& event, bool enable);
             void enableEventWriting(const EventPtr& event, bool enable);
 
+            void assertInLoopThread();
             bool isInLoopThread();
 
             void runInLoop(const Func& f);
@@ -44,7 +45,6 @@ namespace tmms {
             void runEvery(int interval, Func&& f);
 
         private:
-            void assertInLoopThread();
             void runFunctions();
             void weakup();
 
