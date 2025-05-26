@@ -47,6 +47,7 @@ void Acceptor::open() {
     sockopt_ = new SocketOpt(fd_);
     sockopt_->setReuseAddr(true);
     sockopt_->setReusePort(true);
+    sockopt_->setNonBlocking(true);
 
     sockopt_->bind(addr_);
     sockopt_->listen();
@@ -69,17 +70,15 @@ void Acceptor::onRead() {
         InetAddress peerAddr;
         int sock = sockopt_->accept(&peerAddr);
         if (sock >= 0) {
-            
             if (accept_callback_) {
                 accept_callback_(sock, peerAddr);
             }
-
         } else {
             int err = errno;
             if (err != EINTR && err != EAGAIN) {
                 onClose();
-                break;
             }
+            break;
         }
     }
 }

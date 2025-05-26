@@ -9,7 +9,6 @@ TcpConnection::TcpConnection(EventLoop* loop, int fd, const InetAddress& localAd
 }
 
 TcpConnection::~TcpConnection() {
-    onClose();
 }
 
 void TcpConnection::setCloseCallback(const CloseConnectionCallback& cb) {
@@ -21,14 +20,14 @@ void TcpConnection::setCloseCallback(CloseConnectionCallback&& cb) {
 }
 
 void TcpConnection::onClose() {
+    NETLOG_INFO << "tcp connection onClose fd: " << fd_;
     loop_->assertInLoopThread();
 
-    loop_->runInLoop([this]() {
-        if (close_cb_) {
-            close_cb_(std::dynamic_pointer_cast<TcpConnection>(shared_from_this()));
-        }
-        closed_ = true;
-    });
+    if (close_cb_) {
+        close_cb_(std::dynamic_pointer_cast<TcpConnection>(shared_from_this()));
+    }
+    closed_ = true;
+    Event::close();
 }
 
 void TcpConnection::forceClose() {
@@ -93,7 +92,7 @@ void TcpConnection::onWrite() {
 
     if (!io_vec_list_.empty()) {
         while (true) {
-            auto sendLen = ::writev(fd_, &io_vec_list_[0], io_vec_list_.size());
+            size_t sendLen = ::writev(fd_, &io_vec_list_[0], io_vec_list_.size());
             if (sendLen > 0) {
                 while (sendLen > 0) {
                     if (sendLen < io_vec_list_.front().iov_len) {
@@ -181,8 +180,14 @@ void TcpConnection::sendInLoop(const void * buf, size_t len) {
         }
 
         size -= sendLen;
-    }
 
+        if (size == 0) {
+            if (write_complete_cb_) {
+                write_complete_cb_(std::dynamic_pointer_cast<TcpConnection>(shared_from_this()));
+            }
+            return;
+        }
+    }
 
     if (size > 0) {
         struct iovec iov;
@@ -209,5 +214,38 @@ void TcpConnection::sendInLoop(const std::list<BufferNodePtr>& vec) {
 
     if (!io_vec_list_.empty()) {
         enableWriting(true);
+    }
+}
+
+void TcpConnection::setTimeout(uint32_t timeout, const TimeoutCallback& cb) {
+    auto conn = std::dynamic_pointer_cast<TcpConnection>(shared_from_this());
+    loop_->runAfter(timeout, [&conn, &cb]() {
+        cb(conn);
+    });
+}
+
+void TcpConnection::setTimeout(uint32_t timeout, TimeoutCallback&& cb) {
+    auto conn = std::dynamic_pointer_cast<TcpConnection>(shared_from_this());
+    loop_->runAfter(timeout, [&conn, cb]() {
+        cb(conn);
+    });
+}
+
+void TcpConnection::enableMaxIdleTime(uint32_t timeout) {
+    max_idle_ms_ = timeout;
+    auto entry = std::make_shared<TimeoutEntry>(std::dynamic_pointer_cast<TcpConnection>(shared_from_this()));
+    timeout_entry_ = entry;
+    loop_->insertEntry(timeout, entry);
+}
+
+void TcpConnection::onTimeout() {
+    NETLOG_ERROR << "tcp connection timeout. peer: " << peerAddr_.toIpPort();
+    onClose();
+}
+
+void TcpConnection::extendLife() {
+    auto entry = timeout_entry_.lock();
+    if (entry) {
+        loop_->insertEntry(max_idle_ms_, entry);
     }
 }

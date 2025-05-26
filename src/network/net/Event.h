@@ -30,6 +30,7 @@ namespace tmms {
                 int getEvents() const;
 
                 int getFd() const;
+                void close();
                 
             protected:
                 EventLoop* loop_ { nullptr };

@@ -52,6 +52,7 @@ void EventLoop::loop() {
 
         if (ret >= 0) {
             for (int i = 0; i < ret; ++i) {
+                NETLOG_DEBUG << "epoll_wait event: " << i << " fd: " << epoll_events_[i].data.fd << " events: " << epoll_events_[i].events;
                 struct epoll_event& e = epoll_events_[i];
                 int fd = e.data.fd;
 
@@ -126,7 +127,7 @@ void EventLoop::addEvent(const EventPtr& event) {
     e.events = event->getEvents();
     epoll_ctl(epoll_, EPOLL_CTL_ADD, fd, &e);
 
-    NETLOG_INFO << "fd " << fd << " added to epoll";
+    NETLOG_DEBUG << "fd " << fd << " added to epoll events: " << e.events;
 }
 
 void EventLoop::removeEvent(const EventPtr& event) {
@@ -142,6 +143,7 @@ void EventLoop::removeEvent(const EventPtr& event) {
     memset(&e, 0, sizeof(e));
     e.data.fd = fd;
     epoll_ctl(epoll_, EPOLL_CTL_DEL, fd, &e);
+    NETLOG_DEBUG << "fd " << fd << " removed from epoll";
 }
 
 void EventLoop::enableEventReading(const EventPtr& event, bool enable) {
@@ -163,7 +165,13 @@ void EventLoop::enableEventReading(const EventPtr& event, bool enable) {
     memset(&e, 0, sizeof(e));
     e.data.fd = fd;
     e.events = event->getEvents();
-    epoll_ctl(epoll_, EPOLL_CTL_MOD, fd, &e);
+    int ret = epoll_ctl(epoll_, EPOLL_CTL_MOD, fd, &e);
+    if (ret < 0) {
+        NETLOG_ERROR << "EventLoop::enableEventReading(): "
+                     << "fd " << fd << " enable reading failed: " << strerror(errno);
+    } else {
+        NETLOG_DEBUG << "fd " << fd << " enabled reading: " << e.events;
+    }
 }
 
 void EventLoop::enableEventWriting(const EventPtr& event, bool enable) {
@@ -185,7 +193,13 @@ void EventLoop::enableEventWriting(const EventPtr& event, bool enable) {
     memset(&e, 0, sizeof(e));
     e.data.fd = fd;
     e.events = event->getEvents();
-    epoll_ctl(epoll_, EPOLL_CTL_MOD, fd, &e);
+    int ret = epoll_ctl(epoll_, EPOLL_CTL_MOD, fd, &e);
+    if (ret < 0) {
+        NETLOG_ERROR << "EventLoop::enableEventWriting(): "
+                     << "fd " << fd << " enable writing failed: " << strerror(errno);
+    } else {
+        NETLOG_DEBUG << "fd " << fd << " enabled writing: " << e.events;
+    }
 }
 
 void EventLoop::runInLoop(const Func& f) {
@@ -276,6 +290,16 @@ void EventLoop::runEvery(int interval, Func&& f) {
     } else {
         runInLoop([this, interval, f]() {
             timing_wheel_.runEvery(interval, f);
+        });
+    }
+}
+
+void EventLoop::insertEntry(int delay, EntryPtr entry) {
+    if (isInLoopThread()) {
+        timing_wheel_.insertEntry(delay, entry);
+    } else {
+        runInLoop([this, delay, entry]() {
+            timing_wheel_.insertEntry(delay, entry);
         });
     }
 }

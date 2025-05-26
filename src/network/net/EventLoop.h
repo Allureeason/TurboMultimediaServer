@@ -43,6 +43,7 @@ namespace tmms {
             void runAfter(int delay, Func&& f);
             void runEvery(int interval, const Func& f);
             void runEvery(int interval, Func&& f);
+            void insertEntry(int delay, EntryPtr entry);
 
         private:
             void runFunctions();

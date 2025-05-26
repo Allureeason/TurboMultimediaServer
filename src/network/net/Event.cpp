@@ -1,6 +1,7 @@
 #include "Event.h"
 #include "network/base/Network.h"
 #include "EventLoop.h"
+#include <unistd.h>
 
 using namespace tmms::network;
 
@@ -13,6 +14,7 @@ Event::Event(EventLoop* loop, int fd)
 }
 
 Event::~Event() {
+    close();
 }
 
 void Event::onRead() {
@@ -46,4 +48,11 @@ int Event::getEvents() const {
 
 int Event::getFd() const {
     return fd_;
+}
+
+void Event::close() {
+    if (fd_ != -1) {
+        ::close(fd_);
+        fd_ = -1;
+    }
 }

@@ -11,3 +11,6 @@ target_link_libraries(TestSocketOpt base network)
 
 add_executable(TestAcceptor TestAcceptor.cpp)
 target_link_libraries(TestAcceptor base network)
+
+add_executable(TestTcpConnection TestTcpConnection.cpp)
+target_link_libraries(TestTcpConnection base network)
