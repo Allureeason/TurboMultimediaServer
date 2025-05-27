@@ -9,6 +9,8 @@ TcpConnection::TcpConnection(EventLoop* loop, int fd, const InetAddress& localAd
 }
 
 TcpConnection::~TcpConnection() {
+    NETLOG_INFO << "tcp connection destructor fd: " << fd_ << " peer: " << peerAddr_.toIpPort();
+    Event::close();
 }
 
 void TcpConnection::setCloseCallback(const CloseConnectionCallback& cb) {
@@ -30,7 +32,7 @@ void TcpConnection::onClose() {
         close_cb_(std::dynamic_pointer_cast<TcpConnection>(shared_from_this()));
     }
     closed_ = true;
-    loop_->removeEvent(shared_from_this());
+
     Event::close();
 }
 
@@ -62,7 +64,7 @@ void TcpConnection::onRead() {
                 message_cb_(std::dynamic_pointer_cast<TcpConnection>(shared_from_this()), message_buffer_);
             }
         } else if (n == 0) {
-            NETLOG_ERROR << "peer closed";
+            NETLOG_ERROR << "peer closed fd: " << fd_ << " peer: " << peerAddr_.toIpPort();
             onClose();
             break;
         } else {

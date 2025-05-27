@@ -17,3 +17,6 @@ target_link_libraries(TestTcpConnection base network)
 
 add_executable(TestTcpClient TestTcpClient.cpp)
 target_link_libraries(TestTcpClient base network)
+
+add_executable(TestTcpServer TestTcpServer.cpp)
+target_link_libraries(TestTcpServer base network)
