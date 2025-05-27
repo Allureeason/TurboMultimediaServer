@@ -1,7 +1,7 @@
 #ifndef NETWORK_TCP_CLIENT_H
 #define NETWORK_TCP_CLIENT_H
 
-#include "TcpConnection.h"
+#include "network/net/TcpConnection.h"
 
 namespace tmms {
     namespace network {
