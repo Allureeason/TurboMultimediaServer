@@ -36,7 +36,7 @@ void test_tcp_connection(EventLoop* loop, std::vector<TcpConnectionPtr>& tcp_con
             conn->forceClose();
         });
 
-        // tcpConn->enableMaxIdleTime(3);
+        tcpConn->enableMaxIdleTime(3);
 
         tcp_conns.push_back(tcpConn);
         loop->addEvent(tcpConn);
@@ -52,13 +52,12 @@ int main() {
     tmms::base::g_logger = new tmms::base::Logger(nullptr);
     tmms::base::g_logger->setLevel(tmms::base::LogLevel::kInfo);
 
-    EventLoopThreadPool pool(4, 0, 4);
+    auto cpu_num = 1;
+    EventLoopThreadPool pool(cpu_num, 0, cpu_num);
     pool.start();
 
-    std::vector<std::vector<TcpConnectionPtr>> tcp_conns(pool.size());
-    for (int i = 0; i < pool.size(); ++i) {
-        test_tcp_connection(pool.getNextLoop(), tcp_conns[i]);
-    }
+    std::vector<TcpConnectionPtr> tcp_conns;
+    test_tcp_connection(pool.getNextLoop(), tcp_conns);
 
     while (true) {
         std::this_thread::sleep_for(std::chrono::seconds(1));

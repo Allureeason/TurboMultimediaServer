@@ -58,12 +58,12 @@ void InetAddress::getSockAddress(struct sockaddr* addr) const {
     if (is_ipv6_) {
         struct sockaddr_in6* addr6 = reinterpret_cast<sockaddr_in6*>(addr);
         addr6->sin6_family = AF_INET6;
-        addr6->sin6_port = htons(std::stoi(port_));
+        addr6->sin6_port = htons(atoi(port_.c_str()));
         inet_pton(AF_INET6, ip_.c_str(), &addr6->sin6_addr);
     } else {
         sockaddr_in* addr4 = reinterpret_cast<sockaddr_in*>(addr);
         addr4->sin_family = AF_INET;
-        addr4->sin_port = htons(std::stoi(port_));
+        addr4->sin_port = htons(atoi(port_.c_str()));
         inet_pton(AF_INET, ip_.c_str(), &addr4->sin_addr);
     }
 }

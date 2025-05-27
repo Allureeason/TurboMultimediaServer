@@ -20,13 +20,17 @@ void TcpConnection::setCloseCallback(CloseConnectionCallback&& cb) {
 }
 
 void TcpConnection::onClose() {
-    NETLOG_INFO << "tcp connection onClose fd: " << fd_;
     loop_->assertInLoopThread();
+
+    if (closed_) {
+        return;
+    }
 
     if (close_cb_) {
         close_cb_(std::dynamic_pointer_cast<TcpConnection>(shared_from_this()));
     }
     closed_ = true;
+    loop_->removeEvent(shared_from_this());
     Event::close();
 }
 
