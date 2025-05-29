@@ -20,3 +20,6 @@ target_link_libraries(TestTcpClient base network)
 
 add_executable(TestTcpServer TestTcpServer.cpp)
 target_link_libraries(TestTcpServer base network)
+
+add_executable(TestDnsService TestDnsService.cpp)
+target_link_libraries(TestDnsService base network)
