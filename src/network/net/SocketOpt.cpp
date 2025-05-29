@@ -161,3 +161,20 @@ void SocketOpt::setNonBlocking(bool on) {
     }
     ::fcntl(sock_, F_SETFL, flags);
 }
+
+std::string SocketOpt::dumpSockAddr(const struct sockaddr* addr) {
+    // ipv4: 192.168.1.106:10000
+    std::string addr_str;
+    if (addr->sa_family == AF_INET) {
+        struct sockaddr_in* addr_in = const_cast<struct sockaddr_in*>(reinterpret_cast<const struct sockaddr_in*>(addr));
+        char ip[INET_ADDRSTRLEN] = {0};
+        ::inet_ntop(AF_INET, &addr_in->sin_addr, ip, sizeof(ip));
+        addr_str = std::string(ip) + ":" + std::to_string(ntohs(addr_in->sin_port));
+    } else if (addr->sa_family == AF_INET6) {
+        struct sockaddr_in6* addr_in6 = const_cast<struct sockaddr_in6*>(reinterpret_cast<const struct sockaddr_in6*>(addr));
+        char ip[INET6_ADDRSTRLEN] = {0};
+        ::inet_ntop(AF_INET6, &addr_in6->sin6_addr, ip, sizeof(ip));
+        addr_str = std::string(ip) + ":" + std::to_string(ntohs(addr_in6->sin6_port));
+    }
+    return addr_str;
+}

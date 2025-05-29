@@ -4,7 +4,7 @@
 using namespace tmms::network;
 
 UdpSocket::UdpSocket(EventLoop* loop, int sockfd, const InetAddress& local_addr, const InetAddress& peer_addr)
-    : Connection(loop, sockfd, local_addr, peer_addr) {
+    : Connection(loop, sockfd, local_addr, peer_addr), message_buffer_(message_buffer_size_) {
 }
 
 UdpSocket::~UdpSocket() {
@@ -115,6 +115,7 @@ void UdpSocket::onWrite() {
                 if (write_complete_cb_) {
                     write_complete_cb_(std::dynamic_pointer_cast<UdpSocket>(shared_from_this()));
                 }
+                enableWriting(false);
                 break;
             }
         }
@@ -139,6 +140,11 @@ void UdpSocket::onClose() {
 
 void UdpSocket::onError(const std::string& msg) {
     NETLOG_ERROR << "udp socket error, fd: " << fd_ << ", peer: " << peerAddr_.toIpPort() << ", error: " << msg;
+    onClose();
+}
+
+void UdpSocket::onTimeout() {
+    NETLOG_ERROR << "udp socket timeout, fd: " << fd_ << ", peer: " << peerAddr_.toIpPort();
     onClose();
 }
 

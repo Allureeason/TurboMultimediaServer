@@ -39,7 +39,7 @@ namespace tmms {
         class UdpSocket : public Connection {
         public:
             UdpSocket(EventLoop* loop, int sockfd,const InetAddress& local_addr, const InetAddress& peer_addr);
-            ~UdpSocket();
+            virtual ~UdpSocket();
 
             void onTimeout();
 
@@ -70,10 +70,10 @@ namespace tmms {
 
         private:
             std::list<UdpBufferNodePtr> buffer_list_;
-            bool closed_ { true };
+            bool closed_ { false };
             int32_t max_idle_time_ { 30 };
-            MsgBuffer message_buffer_;
             int32_t message_buffer_size_ { 65535 };
+            MsgBuffer message_buffer_;
             std::weak_ptr<UdpTimeoutEntry> timeout_entry_;
 
             UdpSocketMessageCallback message_cb_;

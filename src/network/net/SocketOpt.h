@@ -16,6 +16,7 @@ namespace tmms {
 
             static int createNonblockingTcp(int family);
             static int createNonblockingUdp(int family);
+            static std::string dumpSockAddr(const struct sockaddr* addr);
 
             InetAddressPtr getPeerAddr();
             InetAddressPtr getLocalAddr();
