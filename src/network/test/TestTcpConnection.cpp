@@ -36,7 +36,7 @@ void test_tcp_connection(EventLoop* loop, std::vector<TcpConnectionPtr>& tcp_con
             conn->forceClose();
         });
 
-        tcpConn->enableMaxIdleTime(3);
+        tcpConn->enableCheckIdleTime(3);
 
         tcp_conns.push_back(tcpConn);
         loop->addEvent(tcpConn);

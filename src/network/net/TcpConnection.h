@@ -13,12 +13,6 @@
 namespace tmms {
     namespace network {
 
-        struct BufferNode {
-            void * buf = nullptr;
-            size_t len = 0;
-        };
-        using BufferNodePtr = std::shared_ptr<BufferNode>;
-
         class TcpConnection;
         using TcpConnectionPtr = std::shared_ptr<TcpConnection>;
         using CloseConnectionCallback = std::function<void(TcpConnectionPtr)>;
@@ -53,7 +47,7 @@ namespace tmms {
             void setTimeout(uint32_t timeout, const TimeoutCallback& cb);
             void setTimeout(uint32_t timeout, TimeoutCallback&& cb);
             void onTimeout();
-            void enableMaxIdleTime(uint32_t timeout);
+            void enableCheckIdleTime(uint32_t timeout);
 
         private:
             void sendInLoop(const void * buf, size_t len);

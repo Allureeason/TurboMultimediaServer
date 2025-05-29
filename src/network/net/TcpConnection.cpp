@@ -56,6 +56,9 @@ void TcpConnection::onRead() {
         return;
     }
 
+    // 延长连接生命周期
+    extendLife();
+
     while (true) {
         int err = 0;
         ssize_t n = message_buffer_.readFd(fd_, &err);
@@ -95,6 +98,9 @@ void TcpConnection::onWrite() {
         NETLOG_ERROR << "tcp connection already closed. peer: " << peerAddr_.toIpPort();
         return;
     }
+
+    // 延长连接生命周期
+    extendLife();
 
     if (!io_vec_list_.empty()) {
         while (true) {
@@ -213,7 +219,7 @@ void TcpConnection::sendInLoop(const std::list<BufferNodePtr>& vec) {
 
     for (const auto& node : vec) {
         struct iovec iov;
-        iov.iov_base = node->buf;
+        iov.iov_base = const_cast<void*>(node->buf);
         iov.iov_len = node->len;
         io_vec_list_.push_back(iov);
     }
@@ -237,7 +243,7 @@ void TcpConnection::setTimeout(uint32_t timeout, TimeoutCallback&& cb) {
     });
 }
 
-void TcpConnection::enableMaxIdleTime(uint32_t timeout) {
+void TcpConnection::enableCheckIdleTime(uint32_t timeout) {
     max_idle_ms_ = timeout;
     auto entry = std::make_shared<TimeoutEntry>(std::dynamic_pointer_cast<TcpConnection>(shared_from_this()));
     timeout_entry_ = entry;

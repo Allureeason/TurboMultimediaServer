@@ -23,6 +23,13 @@ namespace tmms {
             kContextCount
         };
 
+        struct BufferNode {
+            BufferNode(const void* data, size_t len) : buf(data), len(len) {}
+            const void * buf { nullptr };
+            size_t len = 0;
+        };
+        using BufferNodePtr = std::shared_ptr<BufferNode>;
+
         class Connection;
         using ConnectionPtr = std::shared_ptr<Connection>;
         using ContextPtr = std::shared_ptr<void>;

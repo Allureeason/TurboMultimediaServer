@@ -77,7 +77,7 @@ void TcpServer::onAccept(int sockfd, const InetAddress& peerAddr) {
     connections_.insert(conn);
     // 添加连接到事件循环
     loop_->addEvent(conn);
-    conn->enableMaxIdleTime(30);
+    conn->enableCheckIdleTime(30);
     // 连接成功，通知上层
     if (new_connection_cb_) {
         new_connection_cb_(conn);
