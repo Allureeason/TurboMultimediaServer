@@ -50,6 +50,11 @@ void EventLoop::loop() {
                         static_cast<int>(epoll_events_.size()),
                         timeout);
 
+        NETLOG_TRACE << "event return count: " << ret;
+        for (const auto& it : events_) {
+            NETLOG_TRACE << "fd: " << it.first << " event use count: " << it.second.use_count();
+        }
+
         if (ret >= 0) {
             for (int i = 0; i < ret; ++i) {
                 NETLOG_DEBUG << "epoll_wait event: " << i << " fd: " << epoll_events_[i].data.fd << " events: " << epoll_events_[i].events;
